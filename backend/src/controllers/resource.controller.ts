@@ -1,9 +1,8 @@
-
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import Resource from "../models/Resource";
-import ReliefCentre from "../models/ReliefCentre";
-import type { ResourceCategory } from "../models/Resource";
+import Resource, { ResourceCategory } from "../models/Resource.js";
+import ReliefCentre from "../models/ReliefCentre.js";
+import Allocation from "../models/Allocation.js";
 
 const categories: ResourceCategory[] = [
   "food",
@@ -212,6 +211,20 @@ export async function deleteResource(req: Request, res: Response) {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       res.status(400).json({ success: false, message: "Invalid resource ID" });
+      return;
+    }
+
+    // Protect allocation history: check if any allocations reference this resource
+    const allocationCount = await Allocation.countDocuments({
+      resource: req.params.id,
+    });
+
+    if (allocationCount > 0) {
+      res.status(409).json({
+        success: false,
+        message:
+          "Cannot delete resource because it is referenced in allocation history. Update its quantity to 0 instead.",
+      });
       return;
     }
 

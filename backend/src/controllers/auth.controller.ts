@@ -1,8 +1,8 @@
-
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import User, { UserRole } from "../models/User";
+import User, { UserRole } from "../models/User.js";
+import { AuthRequest } from "../middleware/authenticate.js";
 
 const allowedRoles: UserRole[] = [
   "admin",
@@ -170,9 +170,7 @@ export async function getMe(
   res: Response
 ): Promise<void> {
   try {
-    const authReq = req as Request & {
-      user?: { id: string };
-    };
+    const authReq = req as AuthRequest;
 
     if (!authReq.user) {
       res.status(401).json({

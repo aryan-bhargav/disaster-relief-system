@@ -1,36 +1,43 @@
-
 import { Request, Response } from "express";
 import ReliefRequest from "../models/ReliefRequest.js";
 import Resource from "../models/Resource.js";
 import ReliefCentre from "../models/ReliefCentre.js";
 import Allocation from "../models/Allocation.js";
+import { AuthRequest } from "../middleware/authenticate.js";
 
 export async function getDashboardStats(
-  _req: Request,
+  req: Request,
   res: Response
 ): Promise<void> {
   try {
+    const authReq = req as AuthRequest;
+    const isFieldUser = authReq.user?.role === "field_user";
+    const requestFilter = isFieldUser
+      ? { requestedBy: authReq.user?.id }
+      : {};
+
     const [
       totalRequests,
       pendingRequests,
       activeCentres,
-      resourceSummary,
+      resourceMetrics,
+      stockByCategory,
       requestsByPriority,
       allocationsByStatus,
       recentRequests,
     ] = await Promise.all([
-      ReliefRequest.countDocuments(),
+      ReliefRequest.countDocuments(requestFilter),
 
-      ReliefRequest.countDocuments({ status: "pending" }),
+      ReliefRequest.countDocuments({ ...requestFilter, status: "pending" }),
 
       ReliefCentre.countDocuments({ isActive: true }),
 
+      // Distinct resource item count and low stock indicators
       Resource.aggregate([
         {
           $group: {
             _id: null,
-            resourceTypes: { $sum: 1 },
-            totalStock: { $sum: "$quantity" },
+            resourceCount: { $sum: 1 },
             lowStockItems: {
               $sum: {
                 $cond: [{ $lte: ["$quantity", 10] }, 1, 0],
@@ -40,7 +47,19 @@ export async function getDashboardStats(
         },
       ]),
 
+      // Stock grouped cleanly by category to prevent misleading addition across units
+      Resource.aggregate([
+        {
+          $group: {
+            _id: "$category",
+            count: { $sum: 1 },
+            quantity: { $sum: "$quantity" },
+          },
+        },
+      ]),
+
       ReliefRequest.aggregate([
+        { $match: requestFilter },
         {
           $group: {
             _id: "$priority",
@@ -58,16 +77,15 @@ export async function getDashboardStats(
         },
       ]),
 
-      ReliefRequest.find()
+      ReliefRequest.find(requestFilter)
         .sort({ createdAt: -1 })
         .limit(5)
         .populate("requestedBy", "name")
         .populate("assignedCentre", "name"),
     ]);
 
-    const stock = resourceSummary[0] ?? {
-      resourceTypes: 0,
-      totalStock: 0,
+    const metrics = resourceMetrics[0] ?? {
+      resourceCount: 0,
       lowStockItems: 0,
     };
 
@@ -79,7 +97,9 @@ export async function getDashboardStats(
     };
 
     for (const item of requestsByPriority) {
-      priorityStats[item._id] = item.count;
+      if (typeof item._id === "string") {
+        priorityStats[item._id] = item.count;
+      }
     }
 
     const allocationStats: Record<string, number> = {
@@ -90,7 +110,16 @@ export async function getDashboardStats(
     };
 
     for (const item of allocationsByStatus) {
-      allocationStats[item._id] = item.count;
+      if (typeof item._id === "string") {
+        allocationStats[item._id] = item.count;
+      }
+    }
+
+    const categorizedStock: Record<string, number> = {};
+    for (const item of stockByCategory) {
+      if (typeof item._id === "string") {
+        categorizedStock[item._id] = item.quantity;
+      }
     }
 
     res.json({
@@ -100,10 +129,12 @@ export async function getDashboardStats(
           totalRequests,
           pendingRequests,
           activeCentres,
-          resourceTypes: stock.resourceTypes,
-          totalStock: stock.totalStock,
-          lowStockItems: stock.lowStockItems,
+          resourceTypes: metrics.resourceCount,
+          // Preserving totalStock key for frontend compatibility, representing total active inventory items
+          totalStock: metrics.resourceCount,
+          lowStockItems: metrics.lowStockItems,
         },
+        stockByCategory: categorizedStock,
         requestsByPriority: priorityStats,
         allocationsByStatus: allocationStats,
         recentRequests,

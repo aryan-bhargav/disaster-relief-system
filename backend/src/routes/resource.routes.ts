@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import {
   getResources,
@@ -6,8 +5,8 @@ import {
   createResource,
   updateResource,
   deleteResource,
-} from "../controllers/resource.controller";
-import { authenticate, authorize } from "../middleware/authenticate";
+} from "../controllers/resource.controller.js";
+import { authenticate, authorize } from "../middleware/authenticate.js";
 
 const router = Router();
 

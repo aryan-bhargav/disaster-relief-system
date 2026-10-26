@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import authRoutes from "./routes/auth.routes";
-import centreRoutes from "./routes/centre.routes";
-import resourceRoutes from "./routes/resource.routes";
-import requestRoutes from "./routes/request.routes";
+import authRoutes from "./routes/auth.routes.js";
+import centreRoutes from "./routes/centre.routes.js";
+import resourceRoutes from "./routes/resource.routes.js";
+import requestRoutes from "./routes/request.routes.js";
 import allocationRoutes from "./routes/allocation.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 
