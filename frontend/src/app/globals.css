@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@tailwind utilities;
 :root {
   /* Surfaces and text */
   --canvas: #F4F6F8;
