@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import {
   createRequest,
@@ -6,8 +5,8 @@ import {
   getRequestById,
   updateRequestStatus,
   cancelOwnRequest,
-} from "../controllers/request.controller";
-import { authenticate, authorize } from "../middleware/authenticate";
+} from "../controllers/request.controller.js";
+import { authenticate, authorize } from "../middleware/authenticate.js";
 
 const router = Router();
 

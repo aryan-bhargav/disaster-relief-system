@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "seed:admin": "tsx src/scripts/seed-admin.ts",
+    "seed:sample": "tsx src/scripts/seed-sample-data.ts",
+    "verify:workflows": "tsx src/scripts/verify-workflows.ts"
   },
   "keywords": [],
   "author": "",

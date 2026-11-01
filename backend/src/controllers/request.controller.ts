@@ -1,9 +1,13 @@
-
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import ReliefRequest from "../models/ReliefRequest";
-import { AuthRequest } from "../middleware/authenticate";
+import ReliefRequest, {
+  RequestPriority,
+  RequestStatus,
+} from "../models/ReliefRequest.js";
+import { AuthRequest } from "../middleware/authenticate.js";
 import ReliefCentre from "../models/ReliefCentre.js";
+import Allocation from "../models/Allocation.js";
+import Resource from "../models/Resource.js";
 
 const categories = [
   "food",
@@ -15,25 +19,38 @@ const categories = [
 ];
 
 const priorities = ["low", "medium", "high", "critical"];
-const statuses = [
+const statuses: RequestStatus[] = [
   "pending",
+  "partially_allocated",
   "allocated",
   "dispatched",
   "delivered",
   "cancelled",
 ];
 
-function validCoordinates(location: any): boolean {
+const allowedTransitions: Record<RequestStatus, RequestStatus[]> = {
+  pending: ["partially_allocated", "allocated", "cancelled"],
+  partially_allocated: ["allocated", "dispatched", "cancelled"],
+  allocated: ["dispatched", "cancelled"],
+  dispatched: ["delivered", "cancelled"],
+  delivered: [],
+  cancelled: [],
+};
+
+function validCoordinates(
+  location: unknown
+): location is { lat: number; lng: number } {
+  if (!location || typeof location !== "object") return false;
+  const loc = location as { lat?: unknown; lng?: unknown };
   return (
-    location &&
-    typeof location.lat === "number" &&
-    typeof location.lng === "number" &&
-    Number.isFinite(location.lat) &&
-    Number.isFinite(location.lng) &&
-    location.lat >= -90 &&
-    location.lat <= 90 &&
-    location.lng >= -180 &&
-    location.lng <= 180
+    typeof loc.lat === "number" &&
+    typeof loc.lng === "number" &&
+    Number.isFinite(loc.lat) &&
+    Number.isFinite(loc.lng) &&
+    loc.lat >= -90 &&
+    loc.lat <= 90 &&
+    loc.lng >= -180 &&
+    loc.lng <= 180
   );
 }
 
@@ -77,8 +94,9 @@ export async function createRequest(req: Request, res: Response) {
       description: description.trim(),
       category,
       quantityNeeded,
+      quantityFulfilled: 0,
       unit: unit.trim(),
-      location,
+      location: { lat: location.lat, lng: location.lng },
       requestedBy: authReq.user.id,
       priority: "medium",
       status: "pending",
@@ -106,7 +124,7 @@ export async function getRequests(req: Request, res: Response) {
     }
 
     if (typeof req.query.status === "string") {
-      if (!statuses.includes(req.query.status)) {
+      if (!statuses.includes(req.query.status as RequestStatus)) {
         res.status(400).json({ success: false, message: "Invalid status filter" });
         return;
       }
@@ -172,15 +190,67 @@ export async function updateRequestStatus(req: Request, res: Response) {
       return;
     }
 
+    const reliefRequest = await ReliefRequest.findById(req.params.id);
+
+    if (!reliefRequest) {
+      res.status(404).json({ success: false, message: "Request not found" });
+      return;
+    }
+
     const { status, priority, assignedCentre } = req.body;
-    const updates: Record<string, unknown> = {};
+
+    if (status === undefined && priority === undefined && assignedCentre === undefined) {
+      res.status(400).json({ success: false, message: "No valid fields provided to update" });
+      return;
+    }
 
     if (status !== undefined) {
-      if (typeof status !== "string" || !statuses.includes(status)) {
-        res.status(400).json({ success: false, message: "Invalid status" });
+      if (typeof status !== "string" || !statuses.includes(status as RequestStatus)) {
+        res.status(400).json({ success: false, message: "Invalid status value" });
         return;
       }
-      updates.status = status;
+
+      const target = status as RequestStatus;
+
+      if (reliefRequest.status !== target) {
+        if (reliefRequest.status === "delivered" || reliefRequest.status === "cancelled") {
+          res.status(400).json({
+            success: false,
+            message: `Cannot change status of a request that is already ${reliefRequest.status}`,
+          });
+          return;
+        }
+
+        const allowed = allowedTransitions[reliefRequest.status] ?? [];
+        if (!allowed.includes(target)) {
+          res.status(400).json({
+            success: false,
+            message: `Invalid status transition from ${reliefRequest.status} to ${target}`,
+          });
+          return;
+        }
+
+        // If cancelling a request that has allocations, return allocated stock to resources
+        if (target === "cancelled") {
+          const activeAllocations = await Allocation.find({
+            request: reliefRequest._id,
+            status: { $in: ["allocated", "dispatched"] },
+          });
+
+          for (const alloc of activeAllocations) {
+            await Resource.updateOne(
+              { _id: alloc.resource },
+              { $inc: { quantity: alloc.quantity } }
+            );
+            alloc.status = "cancelled";
+            await alloc.save();
+          }
+
+          reliefRequest.quantityFulfilled = 0;
+        }
+
+        reliefRequest.status = target;
+      }
     }
 
     if (priority !== undefined) {
@@ -188,7 +258,7 @@ export async function updateRequestStatus(req: Request, res: Response) {
         res.status(400).json({ success: false, message: "Invalid priority" });
         return;
       }
-      updates.priority = priority;
+      reliefRequest.priority = priority as RequestPriority;
     }
 
     if (assignedCentre !== undefined) {
@@ -209,26 +279,16 @@ export async function updateRequestStatus(req: Request, res: Response) {
         return;
       }
 
-      updates.assignedCentre = assignedCentre;
+      reliefRequest.assignedCentre = new mongoose.Types.ObjectId(assignedCentre);
     }
 
-    if (Object.keys(updates).length === 0) {
-      res.status(400).json({ success: false, message: "No valid fields provided" });
-      return;
-    }
+    await reliefRequest.save();
 
-    const reliefRequest = await ReliefRequest.findByIdAndUpdate(
-      req.params.id,
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    const populated = await ReliefRequest.findById(reliefRequest._id)
+      .populate("requestedBy", "name email")
+      .populate("assignedCentre", "name address location");
 
-    if (!reliefRequest) {
-      res.status(404).json({ success: false, message: "Request not found" });
-      return;
-    }
-
-    res.json({ success: true, message: "Request updated", data: reliefRequest });
+    res.json({ success: true, message: "Request updated", data: populated });
   } catch (error) {
     console.error("Update request error:", error);
     res.status(500).json({ success: false, message: "Failed to update request" });
@@ -244,23 +304,22 @@ export async function cancelOwnRequest(req: Request, res: Response) {
 
     const authReq = req as AuthRequest;
 
-    const reliefRequest = await ReliefRequest.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        requestedBy: authReq.user?.id,
-        status: "pending",
-      },
-      { $set: { status: "cancelled" } },
-      { new: true, runValidators: true }
-    );
+    const reliefRequest = await ReliefRequest.findOne({
+      _id: req.params.id,
+      requestedBy: authReq.user?.id,
+      status: "pending",
+    });
 
     if (!reliefRequest) {
       res.status(404).json({
         success: false,
-        message: "Pending request not found or you do not own it",
+        message: "Pending request not found or you do not have permission to cancel it",
       });
       return;
     }
+
+    reliefRequest.status = "cancelled";
+    await reliefRequest.save();
 
     res.json({ success: true, message: "Request cancelled", data: reliefRequest });
   } catch (error) {

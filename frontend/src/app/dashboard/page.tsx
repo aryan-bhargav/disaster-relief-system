@@ -1,11 +1,29 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  RotateCcw,
+  Plus,
+  Activity,
+  MapPin,
+  Package,
+  Truck,
+} from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import type { AuthUser } from "@/types/auth";
+import {
+  AppShell,
+  PageHeader,
+  Button,
+  PriorityBadge,
+  StatusBadge,
+  EmptyState,
+  LoadingState,
+  ErrorState,
+} from "@/components";
 
 interface DashboardData {
   overview: {
@@ -16,6 +34,7 @@ interface DashboardData {
     totalStock: number;
     lowStockItems: number;
   };
+  stockByCategory?: Record<string, number>;
   requestsByPriority: Record<string, number>;
   allocationsByStatus: Record<string, number>;
   recentRequests: {
@@ -25,8 +44,11 @@ interface DashboardData {
     priority: string;
     status: string;
     createdAt: string;
-    requestedBy?: { name?: string };
-    assignedCentre?: { name?: string };
+    quantityNeeded?: number;
+    quantityFulfilled?: number;
+    unit?: string;
+    requestedBy?: { name?: string } | string;
+    assignedCentre?: { name?: string } | string;
   }[];
 }
 
@@ -35,17 +57,25 @@ interface DashboardResponse {
   data: DashboardData;
 }
 
-const navigation = [
-  { label: "Dashboard", href: "/dashboard", icon: "▦" },
-  { label: "Relief Requests", href: "/requests", icon: "▤" },
-  { label: "Resources", href: "/resources", icon: "▣" },
-  { label: "Relief Centres", href: "/centres", icon: "⌖" },
-  { label: "Allocations", href: "/allocations", icon: "⇄" },
-  { label: "Map", href: "/map", icon: "◎" },
-];
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 
-function formatLabel(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 export default function DashboardPage() {
@@ -53,9 +83,10 @@ export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async (isRefresh = false) => {
     const token = sessionStorage.getItem("authToken");
     const storedUser = sessionStorage.getItem("authUser");
 
@@ -72,19 +103,26 @@ export default function DashboardPage() {
       return;
     }
 
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError("");
+
     try {
       const response = await apiRequest<DashboardResponse>(
         "/dashboard/stats",
         { token }
       );
       setData(response.data);
-      setError("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to load dashboard"
+        err instanceof Error ? err.message : "Unable to load operational dashboard data."
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [router]);
 
@@ -92,235 +130,320 @@ export default function DashboardPage() {
     void loadDashboard();
   }, [loadDashboard]);
 
-  function logout() {
+  function handleLogout() {
     sessionStorage.removeItem("authToken");
     sessionStorage.removeItem("authUser");
     router.replace("/login");
   }
 
-  const stats = data
-    ? [
-        {
-          label: "Total Requests",
-          value: data.overview.totalRequests,
-          color: "text-sky-300",
-        },
-        {
-          label: "Pending Requests",
-          value: data.overview.pendingRequests,
-          color: "text-amber-300",
-        },
-        {
-          label: "Active Centres",
-          value: data.overview.activeCentres,
-          color: "text-emerald-300",
-        },
-        {
-          label: "Low Stock Items",
-          value: data.overview.lowStockItems,
-          color: "text-rose-300",
-        },
-      ]
+  const isFieldUser = user?.role === "field_user";
+  const criticalCount = data?.requestsByPriority?.critical ?? 0;
+
+  // Queue requests: prioritize critical/high, then creation date
+  const queueRequests = data?.recentRequests
+    ? [...data.recentRequests].sort((a, b) => {
+        const pA = PRIORITY_ORDER[a.priority?.toLowerCase()] ?? 4;
+        const pB = PRIORITY_ORDER[b.priority?.toLowerCase()] ?? 4;
+        if (pA !== pB) return pA - pB;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
     : [];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 md:flex">
-      <aside className="border-b border-slate-800 bg-slate-900 p-5 md:min-h-screen md:w-64 md:shrink-0 md:border-b-0 md:border-r">
-        <Link href="/dashboard" className="text-lg font-bold">
-          <span className="text-sky-400">Relief</span>Coord
-        </Link>
-
-        <p className="mt-2 text-xs text-slate-500">
-          Disaster Relief Management
-        </p>
-
-        <nav className="mt-8 grid grid-cols-2 gap-2 md:grid-cols-1">
-          {navigation.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`rounded-lg px-3 py-3 text-sm transition ${
-                item.href === "/dashboard"
-                  ? "bg-sky-600 font-semibold text-white"
-                  : "text-slate-300 hover:bg-slate-800"
-              }`}
-            >
-              <span className="mr-3" aria-hidden="true">
-                {item.icon}
-              </span>
-              {item.label}
+    <AppShell user={user} onLogout={handleLogout}>
+      <PageHeader
+        title="Operations overview"
+        description="Current requests, centres, and allocations."
+        primaryAction={
+          isFieldUser ? (
+            <Link href="/requests">
+              <Button size="sm" icon={<Plus className="h-4 w-4" />}>
+                New request
+              </Button>
             </Link>
-          ))}
-        </nav>
-
-        <div className="mt-8 border-t border-slate-800 pt-5">
-          <p className="truncate text-sm font-medium">
-            {user?.name ?? "Loading user..."}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {user ? formatLabel(user.role.replace("_", " ")) : ""}
-          </p>
-          <button
-            onClick={logout}
-            className="mt-4 w-full rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+          ) : (
+            <Link href="/requests">
+              <Button size="sm">
+                View request queue
+              </Button>
+            </Link>
+          )
+        }
+        secondaryAction={
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={refreshing}
+            onClick={() => void loadDashboard(true)}
+            icon={<RotateCcw className="h-3.5 w-3.5" />}
           >
-            Sign out
-          </button>
+            Refresh
+          </Button>
+        }
+      />
+
+      {error && (
+        <div className="mb-6">
+          <ErrorState
+            title="Failed to load dashboard overview"
+            message={error}
+            onRetry={() => void loadDashboard(false)}
+          />
         </div>
-      </aside>
+      )}
 
-      <main className="min-w-0 flex-1 p-5 md:p-8">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm text-slate-400">Overview</p>
-            <h1 className="mt-1 text-3xl font-bold">Dashboard</h1>
-            <p className="mt-2 text-sm text-slate-400">
-              Monitor requests, resources and relief operations.
-            </p>
+      {loading ? (
+        <div className="space-y-6">
+          <LoadingState type="metric" />
+          <div className="grid gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-8">
+              <LoadingState type="table" rows={5} />
+            </div>
+            <div className="lg:col-span-4 space-y-4">
+              <LoadingState type="card" rows={2} />
+            </div>
+          </div>
+        </div>
+      ) : data ? (
+        <>
+          {/* Conditional Attention Strip: rendered only when critical requests exist */}
+          {criticalCount > 0 && (
+            <div
+              role="alert"
+              className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-lg border border-[#FCD2CF] bg-[var(--danger-bg)] text-[var(--danger)] shadow-[0_1px_2px_rgba(23,35,45,0.04)]"
+            >
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-[var(--danger)]" aria-hidden="true" />
+                <span className="text-sm font-medium text-[#8E1C13]">
+                  {criticalCount === 1
+                    ? "1 critical request requires immediate allocation"
+                    : `${criticalCount} critical requests require immediate allocation`}
+                </span>
+              </div>
+              <Link
+                href="/requests?priority=critical"
+                className="text-xs font-semibold text-[var(--danger)] hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                Review critical requests →
+              </Link>
+            </div>
+          )}
+
+          {/* Unified Metric Panel divided by vertical rules */}
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border)] mb-6 shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+            {/* Metric 1: Pending requests */}
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                {isFieldUser ? "My pending requests" : "Pending requests"}
+              </p>
+              <p className="mt-2 text-2xl sm:text-3xl font-semibold tabular-nums text-[var(--text)]">
+                {data.overview.pendingRequests}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {isFieldUser
+                  ? "Awaiting response"
+                  : `Of ${data.overview.totalRequests} total requests`}
+              </p>
+            </div>
+
+            {/* Metric 2: Critical requests */}
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                Critical requests
+              </p>
+              <p
+                className={`mt-2 text-2xl sm:text-3xl font-semibold tabular-nums ${
+                  criticalCount > 0 ? "text-[var(--danger)]" : "text-[var(--text)]"
+                }`}
+              >
+                {criticalCount}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {criticalCount > 0 ? "High urgency" : "No critical backlog"}
+              </p>
+            </div>
+
+            {/* Metric 3: Active relief centres */}
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                Active relief centres
+              </p>
+              <p className="mt-2 text-2xl sm:text-3xl font-semibold tabular-nums text-[var(--text)]">
+                {data.overview.activeCentres}
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Operational facilities
+              </p>
+            </div>
+
+            {/* Metric 4: Pending allocations (Truthful UI: Not available) */}
+            <div className="p-4 sm:p-5">
+              <p className="text-xs font-medium text-[var(--text-muted)]">
+                Pending allocations
+              </p>
+              <p className="mt-2 text-lg sm:text-xl font-medium text-[var(--text-muted)]">
+                Not available
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                Status not tracked in API
+              </p>
+            </div>
           </div>
 
-          <button
-            onClick={() => {
-              setLoading(true);
-              void loadDashboard();
-            }}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800"
-          >
-            Refresh data
-          </button>
-        </header>
-
-        {error && (
-          <div
-            role="alert"
-            className="mt-6 rounded-xl border border-rose-900 bg-rose-950/50 p-4 text-sm text-rose-200"
-          >
-            {error}
-            <p className="mt-1 text-rose-300/80">
-              Ensure the backend is running and your account has dashboard access.
-            </p>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="mt-8 rounded-xl border border-slate-800 p-8 text-slate-400">
-            Loading dashboard data...
-          </div>
-        ) : data ? (
-          <>
-            <section className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat) => (
-                <article
-                  key={stat.label}
-                  className="rounded-2xl border border-slate-800 bg-slate-900 p-5"
-                >
-                  <p className="text-sm text-slate-400">{stat.label}</p>
-                  <p className={`mt-4 text-3xl font-bold ${stat.color}`}>
-                    {stat.value}
+          {/* Operations Readiness & Rapid Coordination Strip */}
+          <div className="mb-6 rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_1px_2px_rgba(23,35,45,0.04)]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E8F3F1] text-[var(--accent)] shrink-0">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]">
+                      Operational Network Active
+                    </h3>
+                    <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
+                      • Road Routing via OSRM
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    {data.overview.activeCentres} facility depots online • {data.overview.totalStock} units catalogued across {data.overview.resourceTypes} categories
                   </p>
-                </article>
-              ))}
-            </section>
-
-            <section className="mt-6 grid gap-6 xl:grid-cols-2">
-              <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                <h2 className="text-lg font-semibold">Requests by priority</h2>
-                <div className="mt-5 space-y-4">
-                  {Object.entries(data.requestsByPriority).map(
-                    ([priority, count]) => {
-                      const total = Math.max(
-                        data.overview.totalRequests,
-                        1
-                      );
-                      const width = Math.min((count / total) * 100, 100);
-
-                      return (
-                        <div key={priority}>
-                          <div className="mb-2 flex justify-between text-sm">
-                            <span className="text-slate-300">
-                              {formatLabel(priority)}
-                            </span>
-                            <span className="font-medium">{count}</span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
-                            <div
-                              className="h-full rounded-full bg-sky-500"
-                              style={{ width: `${width}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
                 </div>
-              </article>
+              </div>
 
-              <article className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                <h2 className="text-lg font-semibold">Allocation status</h2>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  {Object.entries(data.allocationsByStatus).map(
-                    ([status, count]) => (
-                      <div
-                        key={status}
-                        className="rounded-xl bg-slate-800/70 p-4"
-                      >
-                        <p className="text-sm text-slate-400">
-                          {formatLabel(status)}
-                        </p>
-                        <p className="mt-2 text-2xl font-semibold">{count}</p>
-                      </div>
-                    )
-                  )}
-                </div>
-              </article>
-            </section>
-
-            <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Recent requests</h2>
+              {/* Quick Action Navigation Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/map"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-[var(--accent)]" />
+                  <span>Interactive Map</span>
+                </Link>
+                {!isFieldUser && (
+                  <>
+                    <Link
+                      href="/resources"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                    >
+                      <Package className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span>Stock Inventory</span>
+                    </Link>
+                    <Link
+                      href="/allocations"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                    >
+                      <Truck className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span>Allocations</span>
+                    </Link>
+                  </>
+                )}
                 <Link
                   href="/requests"
-                  className="text-sm text-sky-400 hover:underline"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium hover:bg-[var(--accent-hover)] transition-colors shadow-xs"
                 >
-                  View requests →
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Request Queue</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Workspace (8/4 split at >= 1024px) */}
+          <div className="grid gap-6 lg:grid-cols-12 items-start">
+            {/* Left Column (8 cols): Request Queue */}
+            <div className="lg:col-span-8 rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+              <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-3.5 bg-[var(--surface-muted)]">
+                <div>
+                  <h2 className="text-sm font-semibold text-[var(--text)]">
+                    {isFieldUser ? "Your request queue" : "Request queue"}
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    {isFieldUser
+                      ? "Recent relief requests submitted under your account."
+                      : "Priority-ordered operational queue."}
+                  </p>
+                </div>
+                <Link
+                  href="/requests"
+                  className="text-xs font-medium text-[var(--accent)] hover:underline inline-flex items-center gap-1 shrink-0"
+                >
+                  View all requests →
                 </Link>
               </div>
 
-              {data.recentRequests.length === 0 ? (
-                <p className="py-8 text-sm text-slate-400">
-                  No relief requests have been submitted yet.
-                </p>
+              {queueRequests.length === 0 ? (
+                <div className="p-8">
+                  <EmptyState
+                    title={isFieldUser ? "No requests submitted yet" : "No requests in queue"}
+                    description={
+                      isFieldUser
+                        ? "You have not submitted any relief requests yet."
+                        : "There are currently no relief requests in the database."
+                    }
+                    action={
+                      isFieldUser ? (
+                        <Link href="/requests">
+                          <Button size="sm">Submit new request</Button>
+                        </Link>
+                      ) : undefined
+                    }
+                  />
+                </div>
               ) : (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[600px] text-left text-sm">
-                    <thead className="text-slate-400">
-                      <tr className="border-b border-slate-800">
-                        <th className="py-3 pr-4 font-medium">Request</th>
-                        <th className="py-3 pr-4 font-medium">Priority</th>
-                        <th className="py-3 pr-4 font-medium">Status</th>
-                        <th className="py-3 font-medium">Date</th>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm" aria-label="Request queue">
+                    <thead className="border-b border-[var(--border)] bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text-muted)]">
+                      <tr>
+                        <th scope="col" className="py-2.5 px-4 w-28">Priority</th>
+                        <th scope="col" className="py-2.5 px-4">Request</th>
+                        <th scope="col" className="py-2.5 px-4 text-right">Quantity</th>
+                        <th scope="col" className="py-2.5 px-4 w-36">Status</th>
+                        <th scope="col" className="py-2.5 px-4 text-right w-28">Created</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {data.recentRequests.map((request) => (
+                    <tbody className="divide-y divide-[var(--border)]">
+                      {queueRequests.map((req) => (
                         <tr
-                          key={request._id}
-                          className="border-b border-slate-800/70 last:border-0"
+                          key={req._id}
+                          className="hover:bg-[var(--surface-muted)]/70 transition-colors"
                         >
-                          <td className="py-4 pr-4">
-                            <p className="font-medium">{request.title}</p>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {formatLabel(request.category)}
-                            </p>
+                          <td className="py-3 px-4 align-top">
+                            <PriorityBadge priority={req.priority} />
                           </td>
-                          <td className="py-4 pr-4">
-                            {formatLabel(request.priority)}
+                          <td className="py-3 px-4 align-top">
+                            <Link
+                              href="/requests"
+                              className="font-medium text-[var(--text)] hover:text-[var(--accent)] line-clamp-1"
+                            >
+                              {req.title}
+                            </Link>
+                            <span className="text-xs text-[var(--text-muted)] capitalize block mt-0.5">
+                              {req.category}
+                            </span>
                           </td>
-                          <td className="py-4 pr-4">
-                            {formatLabel(request.status)}
+                          <td className="py-3 px-4 text-right tabular-nums font-medium text-[var(--text)] align-top">
+                            {req.quantityNeeded !== undefined ? (
+                              <span>
+                                {req.quantityNeeded}{" "}
+                                <span className="text-xs text-[var(--text-muted)] font-normal">
+                                  {req.unit || ""}
+                                </span>
+                              </span>
+                            ) : (
+                              "—"
+                            )}
                           </td>
-                          <td className="py-4 text-slate-400">
-                            {new Date(request.createdAt).toLocaleDateString()}
+                          <td className="py-3 px-4 align-top">
+                            <StatusBadge status={req.status} />
+                          </td>
+                          <td className="py-3 px-4 text-right text-xs text-[var(--text-muted)] tabular-nums align-top">
+                            {formatDate(req.createdAt)}
                           </td>
                         </tr>
                       ))}
@@ -328,16 +451,141 @@ export default function DashboardPage() {
                   </table>
                 </div>
               )}
-            </section>
-          </>
-        ) : (
-          !error && (
-            <p className="mt-8 text-slate-400">
-              Dashboard data is unavailable.
-            </p>
-          )
-        )}
-      </main>
-    </div>
+            </div>
+
+            {/* Right Column (4 cols): Priority & Allocation Summaries */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Priority Summary */}
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+                <h2 className="text-sm font-semibold text-[var(--text)]">
+                  Requests by priority
+                </h2>
+                <div className="mt-4 space-y-3.5">
+                  {(["critical", "high", "medium", "low"] as const).map((priority) => {
+                    const count = data.requestsByPriority[priority] ?? 0;
+                    const total = Math.max(data.overview.totalRequests, 1);
+                    const pct = Math.min((count / total) * 100, 100);
+
+                    const barColor = {
+                      critical: "bg-[var(--danger)]",
+                      high: "bg-[var(--warning)]",
+                      medium: "bg-[var(--info)]",
+                      low: "bg-[var(--text-muted)]",
+                    }[priority];
+
+                    return (
+                      <div key={priority}>
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="capitalize font-medium text-[var(--text)] flex items-center gap-2">
+                            <span className={`h-2 w-2 rounded-full ${barColor}`} aria-hidden="true" />
+                            {priority}
+                          </span>
+                          <span className="tabular-nums font-semibold text-[var(--text)]">
+                            {count}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${barColor}`}
+                            style={{ width: `${pct}%` }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Allocation Summary (for coordinator/admin) */}
+              {!isFieldUser && data.allocationsByStatus && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-semibold text-[var(--text)]">
+                      Allocation status
+                    </h2>
+                    <Link
+                      href="/allocations"
+                      className="text-xs font-medium text-[var(--accent)] hover:underline"
+                    >
+                      View all →
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(data.allocationsByStatus).map(([status, count]) => (
+                      <div
+                        key={status}
+                        className="p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-left"
+                      >
+                        <p className="text-[11px] text-[var(--text-muted)] capitalize">
+                          {status}
+                        </p>
+                        <p className="mt-1 text-lg font-semibold tabular-nums text-[var(--text)]">
+                          {count}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Stock by Category (for coordinator/admin) */}
+              {!isFieldUser && data.stockByCategory && Object.keys(data.stockByCategory).length > 0 && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-semibold text-[var(--text)]">
+                      Stock by category
+                    </h2>
+                    <Link
+                      href="/resources"
+                      className="text-xs font-medium text-[var(--accent)] hover:underline"
+                    >
+                      Inventory →
+                    </Link>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries(data.stockByCategory).map(([cat, qty]) => (
+                      <div
+                        key={cat}
+                        className="flex items-center justify-between py-1.5 border-b border-[var(--border)] last:border-0 text-xs"
+                      >
+                        <span className="font-medium text-[var(--text)] capitalize">
+                          {cat}
+                        </span>
+                        <span className="tabular-nums font-semibold text-[var(--text)]">
+                          {qty}{" "}
+                          <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                            units
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Field User Guide Panel */}
+              {isFieldUser && (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_1px_2px_rgba(23,35,45,0.06)]">
+                  <h2 className="text-sm font-semibold text-[var(--text)]">
+                    Field Volunteer Operations
+                  </h2>
+                  <p className="mt-2 text-xs text-[var(--text-muted)] leading-relaxed">
+                    Submit emergency relief requests with GPS coordinates. Operations coordinators track, validate, and dispatch resources from central relief depots.
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-[var(--border)]">
+                    <Link href="/requests">
+                      <Button size="sm" className="w-full">
+                        Create new request
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </AppShell>
   );
 }

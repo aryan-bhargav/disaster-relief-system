@@ -1,7 +1,6 @@
-
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import ReliefCentre from "../models/ReliefCentre";
+import ReliefCentre from "../models/ReliefCentre.js";
 
 export async function getCentres(_req: Request, res: Response) {
   try {

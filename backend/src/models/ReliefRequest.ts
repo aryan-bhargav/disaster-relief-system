@@ -1,10 +1,10 @@
-
 import mongoose, { Document, Schema, Types } from "mongoose";
 
 export type RequestPriority = "low" | "medium" | "high" | "critical";
 
 export type RequestStatus =
   | "pending"
+  | "partially_allocated"
   | "allocated"
   | "dispatched"
   | "delivered"
@@ -15,6 +15,7 @@ export interface IReliefRequest extends Document {
   description: string;
   category: string;
   quantityNeeded: number;
+  quantityFulfilled: number;
   unit: string;
   priority: RequestPriority;
   status: RequestStatus;
@@ -52,6 +53,12 @@ const reliefRequestSchema = new Schema<IReliefRequest>(
       required: true,
       min: 1,
     },
+    quantityFulfilled: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
     unit: {
       type: String,
       required: true,
@@ -65,7 +72,14 @@ const reliefRequestSchema = new Schema<IReliefRequest>(
     },
     status: {
       type: String,
-      enum: ["pending", "allocated", "dispatched", "delivered", "cancelled"],
+      enum: [
+        "pending",
+        "partially_allocated",
+        "allocated",
+        "dispatched",
+        "delivered",
+        "cancelled",
+      ],
       default: "pending",
       required: true,
     },

@@ -1,4 +1,3 @@
-
 import { Router } from "express";
 import {
   getCentres,
@@ -6,8 +5,8 @@ import {
   createCentre,
   updateCentre,
   deleteCentre,
-} from "../controllers/centre.controller";
-import { authenticate, authorize } from "../middleware/authenticate";
+} from "../controllers/centre.controller.js";
+import { authenticate, authorize } from "../middleware/authenticate.js";
 
 const router = Router();
 

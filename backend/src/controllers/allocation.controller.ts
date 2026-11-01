@@ -1,9 +1,30 @@
-
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import Allocation from "../models/Allocation.js";
+import Allocation, { AllocationStatus } from "../models/Allocation.js";
 import { AuthRequest } from "../middleware/authenticate.js";
-import { createAllocation } from "../services/allocation.service.js";
+import {
+  createAllocation,
+  updateAllocationStatus,
+} from "../services/allocation.service.js";
+
+const clientErrors: Record<string, { status: number; message: string }> = {
+  INVALID_ID: { status: 400, message: "Invalid ID provided" },
+  INVALID_QUANTITY: { status: 400, message: "Quantity must be a positive whole number" },
+  REQUEST_NOT_FOUND: { status: 404, message: "Relief request not found" },
+  RESOURCE_NOT_FOUND: { status: 404, message: "Resource not found" },
+  REQUEST_NOT_ALLOCATABLE: { status: 409, message: "This request cannot be allocated in its current state" },
+  REQUEST_ALREADY_FULFILLED: { status: 409, message: "This request has already been fully allocated" },
+  QUANTITY_EXCEEDS_REMAINING: { status: 400, message: "Quantity exceeds remaining amount needed for this request" },
+  CONCURRENT_ALLOCATION_CONFLICT: { status: 409, message: "Allocation conflict due to concurrent activity. Please retry." },
+  CATEGORY_MISMATCH: { status: 400, message: "Resource category does not match request category" },
+  UNIT_MISMATCH: { status: 400, message: "Resource unit does not match request unit" },
+  CENTRE_MISMATCH: { status: 400, message: "Resource belongs to a different assigned centre" },
+  CENTRE_INACTIVE: { status: 409, message: "Resource centre is inactive" },
+  INSUFFICIENT_STOCK: { status: 409, message: "Insufficient available stock" },
+  ALLOCATION_NOT_FOUND: { status: 404, message: "Allocation not found" },
+  INVALID_TARGET_STATUS: { status: 400, message: "Invalid target status provided" },
+  INVALID_STATUS_TRANSITION: { status: 400, message: "Invalid allocation status transition" },
+};
 
 export async function allocateResource(req: Request, res: Response) {
   try {
@@ -46,20 +67,6 @@ export async function allocateResource(req: Request, res: Response) {
     });
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
-
-    const clientErrors: Record<string, { status: number; message: string }> = {
-      INVALID_ID: { status: 400, message: "Invalid ID provided" },
-      INVALID_QUANTITY: { status: 400, message: "Quantity must be a positive whole number" },
-      REQUEST_NOT_FOUND: { status: 404, message: "Relief request not found" },
-      RESOURCE_NOT_FOUND: { status: 404, message: "Resource not found" },
-      REQUEST_NOT_ALLOCATABLE: { status: 409, message: "This request cannot be allocated" },
-      CATEGORY_MISMATCH: { status: 400, message: "Resource category does not match request" },
-      UNIT_MISMATCH: { status: 400, message: "Resource unit does not match request unit" },
-      CENTRE_MISMATCH: { status: 400, message: "Resource belongs to a different assigned centre" },
-      CENTRE_INACTIVE: { status: 409, message: "Resource centre is inactive" },
-      INSUFFICIENT_STOCK: { status: 409, message: "Insufficient available stock" },
-    };
-
     const clientError = clientErrors[code];
 
     if (clientError) {
@@ -74,6 +81,60 @@ export async function allocateResource(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       message: "Failed to allocate resource",
+    });
+  }
+}
+
+export async function updateAllocationStatusHandler(req: Request, res: Response) {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { status } = req.body;
+
+    if (!id || !mongoose.isValidObjectId(id)) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid allocation ID",
+      });
+      return;
+    }
+
+    if (
+      typeof status !== "string" ||
+      !["allocated", "dispatched", "delivered", "cancelled"].includes(status)
+    ) {
+      res.status(400).json({
+        success: false,
+        message: "Valid status (allocated, dispatched, delivered, cancelled) is required",
+      });
+      return;
+    }
+
+    const allocation = await updateAllocationStatus(
+      id,
+      status as AllocationStatus
+    );
+
+    res.json({
+      success: true,
+      message: `Allocation status updated to ${status}`,
+      data: allocation,
+    });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    const clientError = clientErrors[code];
+
+    if (clientError) {
+      res.status(clientError.status).json({
+        success: false,
+        message: clientError.message,
+      });
+      return;
+    }
+
+    console.error("Update allocation status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update allocation status",
     });
   }
 }
