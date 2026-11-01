@@ -6,6 +6,7 @@ import resourceRoutes from "./routes/resource.routes.js";
 import requestRoutes from "./routes/request.routes.js";
 import allocationRoutes from "./routes/allocation.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import userRoutes from "./routes/user.routes.js";
 
 const app = express();
 
@@ -20,6 +21,8 @@ app.use("/api/resources", resourceRoutes);
 app.use("/api/allocations", allocationRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/users", userRoutes);
+
 app.get("/api/health", (_req, res) => {
   res.json({
     success: true,

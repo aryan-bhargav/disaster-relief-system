@@ -11,6 +11,7 @@ import {
   Layers,
   ArrowRight,
   Filter,
+  Download,
 } from "lucide-react";
 import {
   AppShell,
@@ -26,12 +27,13 @@ import {
   Toast,
 } from "@/components";
 import { apiRequest } from "@/lib/api";
-import type { AuthUser } from "@/types/auth";
+import type { AuthUser } from "@/types";
 
 type Centre = {
   _id: string;
   name: string;
   address?: string;
+  location?: { lat: number; lng: number };
   isActive?: boolean;
 };
 
@@ -54,6 +56,7 @@ type ReliefRequest = {
   unit: string;
   priority: "critical" | "high" | "medium" | "low" | string;
   status: "pending" | "partially_allocated" | "allocated" | "delivered" | "cancelled" | string;
+  location?: { lat: number; lng: number };
   assignedCentre?: Centre | string;
   createdAt?: string;
 };
@@ -68,6 +71,20 @@ type Allocation = {
   allocatedBy?: { name?: string; email?: string } | string;
   createdAt: string;
 };
+
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
 
 interface ApiResponse<T> {
   success: boolean;
@@ -228,10 +245,11 @@ export default function AllocationsPage() {
 
   // Filter compatible resources
   // Must: stock > 0, match category, match unit, active centre, match assignedCentre if set
+  // Sorted by proximity to request location (nearest facility first)
   const compatibleResources = useMemo(() => {
     if (!selectedRequest) return [];
 
-    return resources.filter((res) => {
+    const filtered = resources.filter((res) => {
       // Must have positive available quantity
       if (res.quantity <= 0) return false;
 
@@ -256,6 +274,33 @@ export default function AllocationsPage() {
 
       return true;
     });
+
+    // Proximity sorting: nearest facility first
+    if (selectedRequest.location && typeof selectedRequest.location.lat === "number") {
+      return [...filtered].sort((a, b) => {
+        const centreA = typeof a.centre === "object" ? a.centre : null;
+        const centreB = typeof b.centre === "object" ? b.centre : null;
+        const distA = centreA?.location
+          ? calculateDistanceKm(
+              selectedRequest.location!.lat,
+              selectedRequest.location!.lng,
+              centreA.location.lat,
+              centreA.location.lng
+            )
+          : 99999;
+        const distB = centreB?.location
+          ? calculateDistanceKm(
+              selectedRequest.location!.lat,
+              selectedRequest.location!.lng,
+              centreB.location.lat,
+              centreB.location.lng
+            )
+          : 99999;
+        return distA - distB;
+      });
+    }
+
+    return filtered;
   }, [selectedRequest, resources]);
 
   const selectedResource = useMemo(() => {
@@ -403,6 +448,29 @@ export default function AllocationsPage() {
     });
   }, [allocations, historyStatusFilter]);
 
+  function exportAllocationsCSV() {
+    if (filteredAllocations.length === 0) return;
+    const headers = ["Relief Request", "Resource Item", "Storage Facility", "Quantity", "Status", "Date"];
+    const rows = filteredAllocations.map((a) => [
+      `"${getEntityName(a.request).replace(/"/g, '""')}"`,
+      `"${getEntityName(a.resource).replace(/"/g, '""')}"`,
+      `"${getEntityName(a.centre).replace(/"/g, '""')}"`,
+      a.quantity,
+      a.status,
+      a.createdAt ? new Date(a.createdAt).toISOString().slice(0, 10) : "",
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `reliefops_allocations_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setToastMessage({ text: "Allocation history exported as CSV file.", type: "success" });
+  }
+
   return (
     <AppShell user={user}>
       <div className="max-w-[1440px] mx-auto pb-12">
@@ -497,10 +565,21 @@ export default function AllocationsPage() {
                       : "Choose available resource..."}
                   </option>
                   {compatibleResources.map((res) => {
+                    const centreObj = typeof res.centre === "object" ? res.centre : null;
                     const centreName = getEntityName(res.centre);
+                    let distanceLabel = "";
+                    if (selectedRequest?.location && centreObj?.location) {
+                      const d = calculateDistanceKm(
+                        selectedRequest.location.lat,
+                        selectedRequest.location.lng,
+                        centreObj.location.lat,
+                        centreObj.location.lng
+                      );
+                      distanceLabel = ` [~${d} km away]`;
+                    }
                     return (
                       <option key={res._id} value={res._id}>
-                        {res.name} — {res.quantity.toLocaleString()} {res.unit} at {centreName}
+                        {res.name} — {res.quantity.toLocaleString()} {res.unit} at {centreName}{distanceLabel}
                       </option>
                     );
                   })}
@@ -721,21 +800,33 @@ export default function AllocationsPage() {
               </p>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-              <select
-                value={historyStatusFilter}
-                onChange={(e) => setHistoryStatusFilter(e.target.value)}
-                className="h-8 px-2.5 rounded-lg border border-[var(--border)] bg-white text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                aria-label="Filter history by status"
+            {/* Status Filter & CSV Export */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <select
+                  value={historyStatusFilter}
+                  onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                  className="h-8 px-2.5 rounded-lg border border-[var(--border)] bg-white text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  aria-label="Filter history by status"
+                >
+                  <option value="all">All statuses ({allocations.length})</option>
+                  <option value="allocated">Allocated</option>
+                  <option value="dispatched">Dispatched</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={exportAllocationsCSV}
+                disabled={filteredAllocations.length === 0}
               >
-                <option value="all">All statuses ({allocations.length})</option>
-                <option value="allocated">Allocated</option>
-                <option value="dispatched">Dispatched</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+                <Download className="w-3.5 h-3.5 mr-1" />
+                Export CSV
+              </Button>
             </div>
           </div>
 

@@ -17,6 +17,7 @@ import {
   Layers,
   ArrowRight,
   Package,
+  Navigation,
 } from "lucide-react";
 import {
   AppShell,
@@ -86,6 +87,29 @@ export default function CentresPage() {
   const [formContact, setFormContact] = useState("");
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  function handleGetCurrentLocation() {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      setFormError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setFetchingLocation(true);
+    setFormError("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormLat(position.coords.latitude.toFixed(5));
+        setFormLng(position.coords.longitude.toFixed(5));
+        setFetchingLocation(false);
+        setToastMessage({ text: "Current GPS coordinates captured", type: "success" });
+      },
+      (err) => {
+        setFetchingLocation(false);
+        setFormError(`Could not capture GPS location: ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
 
   // Deactivate / Reactivate Dialog state
   const [centreToToggle, setCentreToToggle] = useState<Centre | null>(null);
@@ -846,46 +870,63 @@ export default function CentresPage() {
                   />
                 </FormField>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    id="centre-lat"
-                    label="Latitude"
-                    required
-                    helperText="Decimal degrees (−90 to 90)"
-                  >
-                    <input
-                      id="centre-lat"
-                      type="number"
-                      required
-                      step="any"
-                      min="-90"
-                      max="90"
-                      value={formLat}
-                      onChange={(e) => setFormLat(e.target.value)}
-                      placeholder="28.6139"
-                      className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-white text-sm text-[var(--text)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                    />
-                  </FormField>
+                <div className="pt-2 border-t border-[var(--border)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                      Coordinates (WGS84)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleGetCurrentLocation}
+                      disabled={fetchingLocation}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent)] hover:underline disabled:opacity-50"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      {fetchingLocation ? "Capturing GPS..." : "Use Current Location"}
+                    </button>
+                  </div>
 
-                  <FormField
-                    id="centre-lng"
-                    label="Longitude"
-                    required
-                    helperText="Decimal degrees (−180 to 180)"
-                  >
-                    <input
-                      id="centre-lng"
-                      type="number"
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      id="centre-lat"
+                      label="Latitude"
                       required
-                      step="any"
-                      min="-180"
-                      max="180"
-                      value={formLng}
-                      onChange={(e) => setFormLng(e.target.value)}
-                      placeholder="77.2090"
-                      className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-white text-sm text-[var(--text)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                    />
-                  </FormField>
+                      helperText="Decimal degrees (−90 to 90)"
+                    >
+                      <input
+                        id="centre-lat"
+                        type="number"
+                        required
+                        step="any"
+                        min="-90"
+                        max="90"
+                        value={formLat}
+                        onChange={(e) => setFormLat(e.target.value)}
+                        placeholder="28.6139"
+                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-white text-sm text-[var(--text)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      />
+                    </FormField>
+
+                    <FormField
+                      id="centre-lng"
+                      label="Longitude"
+                      required
+                      helperText="Decimal degrees (−180 to 180)"
+                    >
+                      <input
+                        id="centre-lng"
+                        type="number"
+                        required
+                        step="any"
+                        min="-180"
+                        max="180"
+                        value={formLng}
+                        onChange={(e) => setFormLng(e.target.value)}
+                        placeholder="77.2090"
+                        className="w-full h-10 px-3 rounded-lg border border-[var(--border)] bg-white text-sm text-[var(--text)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      />
+                    </FormField>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)]">

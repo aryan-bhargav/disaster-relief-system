@@ -1,47 +1,287 @@
 @import "tailwindcss";
 
-:root {
-  /* Surfaces and text */
+/* ============================================================
+   RELIEFOPS DESIGN SYSTEM
+   Themes:
+   1. light    - ReliefOps Light (default)
+   2. dark     - Midnight Operations
+   3. tactical - High Visibility
+   4. ocean    - Ocean Blue
+   5. forest   - Forest Green
+
+   Apply a theme to <html>:
+   <html data-theme="light">
+   ============================================================ */
+
+
+/* ============================================================
+   1. THEME TOKENS
+   ============================================================ */
+
+/* 01 — ReliefOps Light (default) */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
   --canvas: #F4F6F8;
   --surface: #FFFFFF;
-  --surface-muted: #EEF2F5;
+  --surface-muted: #EDF1F5;
+  --surface-subtle: #F8FAFC;
+  --surface-elevated: #FFFFFF;
+
   --sidebar: #17232D;
   --sidebar-hover: #243541;
-  --sidebar-text: #C9D3DA;
-  --sidebar-muted: #8A99A5;
-  --sidebar-divider: #2C3E4B;
-  --text: #17232D;
-  --text-muted: #5E6B75;
-  --border: #DCE3E8;
+  --sidebar-text: #E7EDF2;
+  --sidebar-muted: #A6B4BE;
+  --sidebar-divider: #344652;
 
-  /* Accent and semantic */
+  --text: #17232D;
+  --text-muted: #52616D;
+  --text-subtle: #697985;
+
+  --border: #D6DEE5;
+  --border-subtle: #E6EBF0;
+
   --accent: #176B63;
   --accent-hover: #11564F;
+  --accent-muted: #E5F2EF;
+  --accent-text: #FFFFFF;
+
   --danger: #B42318;
   --danger-bg: #FEECEB;
-  --warning: #975A16;
+  --warning: #925A12;
   --warning-bg: #FFF3D6;
-  --success: #216E4E;
-  --success-bg: #E7F5EC;
+  --success: #176B49;
+  --success-bg: #E5F4EB;
   --info: #245C8A;
   --info-bg: #EAF2FA;
+
+  --input-bg: #FFFFFF;
+  --input-text: #17232D;
+  --input-border: #CBD5DF;
+  --placeholder: #718096;
+
+  --overlay: rgb(15 23 42 / 45%);
+  --shadow: 0 4px 16px rgb(15 23 42 / 7%);
 }
+
+/* 02 — Midnight Operations */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #0B1117;
+  --surface: #131D26;
+  --surface-muted: #1C2934;
+  --surface-subtle: #16212A;
+  --surface-elevated: #1B2934;
+
+  --sidebar: #070C11;
+  --sidebar-hover: #17232D;
+  --sidebar-text: #E6EDF3;
+  --sidebar-muted: #AAB8C3;
+  --sidebar-divider: #2B3B47;
+
+  --text: #EDF3F8;
+  --text-muted: #B1C0CC;
+  --text-subtle: #91A2AF;
+
+  --border: #33434F;
+  --border-subtle: #253540;
+
+  --accent: #27B3A3;
+  --accent-hover: #39C6B5;
+  --accent-muted: #123A36;
+  --accent-text: #061B19;
+
+  --danger: #FF7972;
+  --danger-bg: #421D20;
+  --warning: #FFC15A;
+  --warning-bg: #3E301A;
+  --success: #4AD69A;
+  --success-bg: #143B2B;
+  --info: #70BCF5;
+  --info-bg: #172F46;
+
+  --input-bg: #17232D;
+  --input-text: #F1F5F9;
+  --input-border: #40515E;
+  --placeholder: #AAB8C3;
+
+  --overlay: rgb(0 0 0 / 70%);
+  --shadow: 0 6px 24px rgb(0 0 0 / 30%);
+}
+
+/* 03 — Tactical High Visibility */
+[data-theme="tactical"] {
+  color-scheme: dark;
+
+  --canvas: #11120F;
+  --surface: #1B1D18;
+  --surface-muted: #262820;
+  --surface-subtle: #20221C;
+  --surface-elevated: #292B22;
+
+  --sidebar: #090A08;
+  --sidebar-hover: #25271F;
+  --sidebar-text: #FDE68A;
+  --sidebar-muted: #C2C3B5;
+  --sidebar-divider: #3B3D30;
+
+  --text: #F8F7EF;
+  --text-muted: #D1D2C5;
+  --text-subtle: #B3B5A7;
+
+  --border: #484A3C;
+  --border-subtle: #34362C;
+
+  --accent: #F5B82E;
+  --accent-hover: #FFD166;
+  --accent-muted: #42330F;
+  --accent-text: #211600;
+
+  --danger: #FF8585;
+  --danger-bg: #491C1C;
+  --warning: #FFD166;
+  --warning-bg: #49360D;
+  --success: #5EE0A0;
+  --success-bg: #123E2B;
+  --info: #6DCBFF;
+  --info-bg: #12354B;
+
+  --input-bg: #20221C;
+  --input-text: #FFFFFF;
+  --input-border: #555747;
+  --placeholder: #B8B9AC;
+
+  --overlay: rgb(0 0 0 / 80%);
+  --shadow: 0 5px 20px rgb(0 0 0 / 40%);
+}
+
+/* 04 — Ocean Blue */
+[data-theme="ocean"] {
+  color-scheme: light;
+
+  --canvas: #EDF4FA;
+  --surface: #FFFFFF;
+  --surface-muted: #E3EDF6;
+  --surface-subtle: #F4F8FC;
+  --surface-elevated: #FFFFFF;
+
+  --sidebar: #10263F;
+  --sidebar-hover: #1C3A59;
+  --sidebar-text: #E6F1FF;
+  --sidebar-muted: #A9BED4;
+  --sidebar-divider: #304A65;
+
+  --text: #142C45;
+  --text-muted: #4D657D;
+  --text-subtle: #71869B;
+
+  --border: #CBD9E6;
+  --border-subtle: #E0E9F1;
+
+  --accent: #1769AA;
+  --accent-hover: #10578F;
+  --accent-muted: #E1EFFB;
+  --accent-text: #FFFFFF;
+
+  --danger: #B42336;
+  --danger-bg: #FCE8EB;
+  --warning: #93600C;
+  --warning-bg: #FFF3D5;
+  --success: #16734B;
+  --success-bg: #E2F5EA;
+  --info: #175C9B;
+  --info-bg: #E2F0FC;
+
+  --input-bg: #FFFFFF;
+  --input-text: #142C45;
+  --input-border: #B9CCDD;
+  --placeholder: #71869B;
+
+  --overlay: rgb(13 35 58 / 50%);
+  --shadow: 0 4px 18px rgb(28 65 100 / 8%);
+}
+
+/* 05 — Forest Green */
+[data-theme="forest"] {
+  color-scheme: light;
+
+  --canvas: #F0F4EF;
+  --surface: #FFFFFF;
+  --surface-muted: #E5ECE4;
+  --surface-subtle: #F6F8F4;
+  --surface-elevated: #FFFFFF;
+
+  --sidebar: #172D25;
+  --sidebar-hover: #254438;
+  --sidebar-text: #E6F2E9;
+  --sidebar-muted: #A9C0AF;
+  --sidebar-divider: #365344;
+
+  --text: #1B3025;
+  --text-muted: #526B5A;
+  --text-subtle: #748A79;
+
+  --border: #D1DED2;
+  --border-subtle: #E4EBE3;
+
+  --accent: #357A50;
+  --accent-hover: #286540;
+  --accent-muted: #E4F1E7;
+  --accent-text: #FFFFFF;
+
+  --danger: #B42332;
+  --danger-bg: #FCE9E9;
+  --warning: #94600F;
+  --warning-bg: #FFF3D9;
+  --success: #267548;
+  --success-bg: #E2F3E7;
+  --info: #28658B;
+  --info-bg: #E5F0F7;
+
+  --input-bg: #FFFFFF;
+  --input-text: #1B3025;
+  --input-border: #C4D4C6;
+  --placeholder: #748A79;
+
+  --overlay: rgb(14 35 24 / 50%);
+  --shadow: 0 4px 18px rgb(30 65 40 / 8%);
+}
+
+
+/* ============================================================
+   2. TAILWIND CSS V4 THEME MAPPING
+   Use classes such as:
+   bg-canvas, bg-surface, text-text-main, text-text-muted,
+   border-border-main, bg-accent, text-success, bg-danger-bg.
+   ============================================================ */
 
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-elevated: var(--surface-elevated);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-text: var(--sidebar-text);
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-divider: var(--sidebar-divider);
+
   --color-text-main: var(--text);
   --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+
   --color-border-main: var(--border);
+  --color-border-subtle: var(--border-subtle);
 
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-text: var(--accent-text);
+
   --color-danger: var(--danger);
   --color-danger-bg: var(--danger-bg);
   --color-warning: var(--warning);
@@ -50,32 +290,340 @@
   --color-success-bg: var(--success-bg);
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
+
+  --color-input-bg: var(--input-bg);
+  --color-input-text: var(--input-text);
+  --color-input-border: var(--input-border);
+  --color-placeholder: var(--placeholder);
 }
 
-body {
-  background-color: var(--canvas);
+
+/* ============================================================
+   3. BASE ELEMENT STYLES
+   Kept inside @layer base so Tailwind utility classes can
+   intentionally override them (e.g. text-white on a button).
+   ============================================================ */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-height: 100%;
+    background: var(--canvas);
+    color: var(--text);
+  }
+
+  body {
+    min-height: 100vh;
+    margin: 0;
+    background-color: var(--canvas);
+    color: var(--text);
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  p,
+  li,
+  label {
+    color: inherit;
+  }
+
+  a {
+    color: var(--accent);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--input-text);
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
+    opacity: 1;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    color: var(--text-subtle);
+    background-color: var(--surface-muted);
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  option {
+    color: var(--text);
+    background-color: var(--surface);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--accent);
+  }
+
+  ::selection {
+    color: var(--text);
+    background: var(--accent-muted);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+}
+
+
+/* ============================================================
+   4. REUSABLE THEME-AWARE COMPONENT CLASSES
+   These are component-layer styles, so Tailwind utilities
+   can override them when required.
+   ============================================================ */
+
+@layer components {
+  .theme-surface {
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .theme-card {
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .theme-muted {
+    color: var(--text);
+    background: var(--surface-muted);
+  }
+
+  .theme-sidebar {
+    color: var(--sidebar-text);
+    background: var(--sidebar);
+  }
+
+  .theme-sidebar-muted {
+    color: var(--sidebar-muted);
+  }
+
+  .theme-button {
+    color: var(--accent-text);
+    background: var(--accent);
+  }
+
+  .theme-button:hover {
+    background: var(--accent-hover);
+  }
+
+  .theme-input {
+    color: var(--input-text);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+  }
+
+  .theme-input::placeholder {
+    color: var(--placeholder);
+    opacity: 1;
+  }
+
+  .badge-success {
+    color: var(--success);
+    background: var(--success-bg);
+  }
+
+  .badge-danger {
+    color: var(--danger);
+    background: var(--danger-bg);
+  }
+
+  .badge-warning {
+    color: var(--warning);
+    background: var(--warning-bg);
+  }
+
+  .badge-info {
+    color: var(--info);
+    background: var(--info-bg);
+  }
+}
+
+
+/* ============================================================
+   5. UTILITIES
+   ============================================================ */
+
+@layer utilities {
+  .text-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bg-overlay {
+    background-color: var(--overlay);
+  }
+
+  .shadow-theme {
+    box-shadow: var(--shadow);
+  }
+}
+
+
+/* ============================================================
+   6. AUTOFILL FIX
+   Keeps browser autofill readable in every theme.
+   ============================================================ */
+
+@layer base {
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: var(--input-text);
+    caret-color: var(--input-text);
+    box-shadow: 0 0 0 1000px var(--input-bg) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}
+
+
+/* ============================================================
+   7. SCROLLBARS
+   ============================================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--surface);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+}
+
+
+/* ============================================================
+   8. LEAFLET MAP
+   Do not invert map tiles globally: it damages labels,
+   road colors and map controls. Use theme-appropriate tile
+   providers/layers for dark maps where needed.
+   ============================================================ */
+
+.leaflet-container {
   color: var(--text);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+  background: var(--surface-muted);
 }
 
-/* Global focus visibility */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.leaflet-control,
+.leaflet-bar,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
+.leaflet-control a {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
 }
 
-/* Accessible transitions respecting user preferences */
+.leaflet-control-attribution {
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+
+/* ============================================================
+   9. THEME TRANSITIONS
+   ============================================================ */
+
+body,
+.theme-surface,
+.theme-card,
+.theme-muted,
+.theme-sidebar,
+.theme-button,
+.theme-input {
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+
+/* ============================================================
+   10. REDUCED MOTION
+   ============================================================ */
+
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }

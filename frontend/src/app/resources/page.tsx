@@ -14,6 +14,7 @@ import {
   Building2,
   Layers,
   CheckCircle2,
+  Download,
 } from "lucide-react";
 import {
   AppShell,
@@ -207,6 +208,52 @@ export default function ResourcesPage() {
     setDebouncedSearch("");
     setSelectedCategory("all");
     setSelectedCentre("all");
+  }
+
+  function exportResourcesCSV() {
+    if (filteredResources.length === 0) return;
+    const headers = [
+      "Resource item",
+      "Category",
+      "Storage facility",
+      "Available quantity",
+      "Unit",
+      "Status",
+    ];
+    const rows = filteredResources.map((res) => {
+      const centreName =
+        typeof res.centre === "object" && res.centre
+          ? res.centre.name
+          : typeof res.centre === "string"
+          ? res.centre
+          : "Unassigned facility";
+      return [
+        `"${res.name.replace(/"/g, '""')}"`,
+        res.category,
+        `"${centreName.replace(/"/g, '""')}"`,
+        res.quantity,
+        res.unit,
+        res.quantity === 0 ? "Depleted" : "In stock",
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `reliefops_inventory_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setToastMessage({
+      text: "Inventory report exported as CSV.",
+      type: "success",
+    });
   }
 
   // Open Add modal
@@ -480,6 +527,17 @@ export default function ResourcesPage() {
               Clear filters
             </Button>
           )}
+
+          {/* Export CSV */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={exportResourcesCSV}
+            disabled={filteredResources.length === 0}
+          >
+            <Download className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+            Export CSV
+          </Button>
 
           {/* Results Count */}
           <div className="text-xs text-[var(--text-muted)] ml-auto font-medium">

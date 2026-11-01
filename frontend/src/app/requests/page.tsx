@@ -14,6 +14,7 @@ import {
   Layers,
   ArrowRight,
   RotateCcw,
+  Navigation,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import type { AuthUser } from "@/types/auth";
@@ -131,6 +132,29 @@ export default function RequestsPage() {
   const [newPriority, setNewPriority] = useState<Priority>("medium");
   const [newLat, setNewLat] = useState("");
   const [newLng, setNewLng] = useState("");
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  function handleGetCurrentLocation() {
+    if (typeof window === "undefined" || !("geolocation" in navigator)) {
+      setCreateError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setFetchingLocation(true);
+    setCreateError("");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setNewLat(position.coords.latitude.toFixed(5));
+        setNewLng(position.coords.longitude.toFixed(5));
+        setFetchingLocation(false);
+        setToastMessage("Current GPS coordinates captured");
+      },
+      (err) => {
+        setFetchingLocation(false);
+        setCreateError(`Could not capture GPS location: ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
 
   // Cancel Confirmation Dialog
   const [cancelTarget, setCancelTarget] = useState<ReliefRequest | null>(null);
@@ -164,6 +188,24 @@ export default function RequestsPage() {
       router.replace("/login");
     }
   }, [router]);
+
+  // Check URL parameters for coordinate pre-population or auto-open
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlLat = params.get("lat");
+      const urlLng = params.get("lng");
+      const openCreate = params.get("create");
+
+      if (urlLat && urlLng) {
+        setNewLat(urlLat);
+        setNewLng(urlLng);
+      }
+      if (openCreate === "true") {
+        setIsCreateOpen(true);
+      }
+    }
+  }, []);
 
   // Load requests
   const loadRequests = useCallback(async () => {
@@ -838,40 +880,57 @@ export default function RequestsPage() {
                 </FormField>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[var(--border)]">
-                <FormField
-                  id="req-lat"
-                  label="Latitude"
-                  helperText="Decimal degrees: −90.0 to 90.0"
-                  required
-                >
-                  <Input
-                    id="req-lat"
-                    type="number"
-                    step="any"
-                    value={newLat}
-                    onChange={(e) => setNewLat(e.target.value)}
-                    placeholder="e.g. 28.6139"
-                    required
-                  />
-                </FormField>
+              <div className="pt-2 border-t border-[var(--border)]">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                    Coordinates (WGS84)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleGetCurrentLocation}
+                    disabled={fetchingLocation}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--accent)] hover:underline disabled:opacity-50"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    {fetchingLocation ? "Capturing GPS..." : "Use Current Location"}
+                  </button>
+                </div>
 
-                <FormField
-                  id="req-lng"
-                  label="Longitude"
-                  helperText="Decimal degrees: −180.0 to 180.0"
-                  required
-                >
-                  <Input
-                    id="req-lng"
-                    type="number"
-                    step="any"
-                    value={newLng}
-                    onChange={(e) => setNewLng(e.target.value)}
-                    placeholder="e.g. 77.2090"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    id="req-lat"
+                    label="Latitude"
+                    helperText="Decimal degrees: −90.0 to 90.0"
                     required
-                  />
-                </FormField>
+                  >
+                    <Input
+                      id="req-lat"
+                      type="number"
+                      step="any"
+                      value={newLat}
+                      onChange={(e) => setNewLat(e.target.value)}
+                      placeholder="e.g. 28.6139"
+                      required
+                    />
+                  </FormField>
+
+                  <FormField
+                    id="req-lng"
+                    label="Longitude"
+                    helperText="Decimal degrees: −180.0 to 180.0"
+                    required
+                  >
+                    <Input
+                      id="req-lng"
+                      type="number"
+                      step="any"
+                      value={newLng}
+                      onChange={(e) => setNewLng(e.target.value)}
+                      placeholder="e.g. 77.2090"
+                      required
+                    />
+                  </FormField>
+                </div>
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-[var(--border)]">

@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, RotateCcw, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  RotateCcw,
+  Plus,
+  Activity,
+  MapPin,
+  Package,
+  Truck,
+} from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import type { AuthUser } from "@/types/auth";
 import {
@@ -279,6 +287,70 @@ export default function DashboardPage() {
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 Status not tracked in API
               </p>
+            </div>
+          </div>
+
+          {/* Operations Readiness & Rapid Coordination Strip */}
+          <div className="mb-6 rounded-xl border border-[var(--border)] bg-white p-4 shadow-[0_1px_2px_rgba(23,35,45,0.04)]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E8F3F1] text-[var(--accent)] shrink-0">
+                  <Activity className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text)]">
+                      Operational Network Active
+                    </h3>
+                    <span className="text-[11px] text-[var(--text-muted)] hidden sm:inline">
+                      • Road Routing via OSRM
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    {data.overview.activeCentres} facility depots online • {data.overview.totalStock} units catalogued across {data.overview.resourceTypes} categories
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Action Navigation Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/map"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-[var(--accent)]" />
+                  <span>Interactive Map</span>
+                </Link>
+                {!isFieldUser && (
+                  <>
+                    <Link
+                      href="/resources"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                    >
+                      <Package className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span>Stock Inventory</span>
+                    </Link>
+                    <Link
+                      href="/allocations"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs font-medium text-[var(--text)] hover:bg-neutral-200 transition-colors"
+                    >
+                      <Truck className="h-3.5 w-3.5 text-[var(--accent)]" />
+                      <span>Allocations</span>
+                    </Link>
+                  </>
+                )}
+                <Link
+                  href="/requests"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-xs font-medium hover:bg-[var(--accent-hover)] transition-colors shadow-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Request Queue</span>
+                </Link>
+              </div>
             </div>
           </div>
 

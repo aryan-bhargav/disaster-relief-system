@@ -49,6 +49,15 @@ disaster-relief-system/
 │   │   ├── server.ts                      # Server bootstrap (connectDB + app.listen on PORT 5000)
 │   │   ├── config/
 │   │   │   └── db.ts                      # Mongoose connection to process.env.MONGODB_URI
+│   │   ├── constants/
+│   │   │   ├── roles.constants.ts         # UserRole enum constants (admin, coordinator, field_user)
+│   │   │   ├── status.constants.ts        # REQUEST_STATUS, ALLOCATION_STATUS, PRIORITY_LEVELS
+│   │   │   ├── categories.constants.ts    # RESOURCE_CATEGORIES, RESOURCE_UNITS
+│   │   │   └── index.ts                   # Barrel export
+│   │   ├── types/
+│   │   │   ├── auth.types.ts              # TokenPayload, AuthenticatedUser, AuthenticatedRequest
+│   │   │   ├── api.types.ts               # Standard ApiResponse, ApiErrorResponse
+│   │   │   └── index.ts                   # Barrel export
 │   │   ├── middleware/
 │   │   │   └── authenticate.ts            # JWT verification (`authenticate`) and role checking (`authorize(...)`)
 │   │   ├── models/
@@ -63,20 +72,22 @@ disaster-relief-system/
 │   │   │   ├── resource.controller.ts     # getResources, getResourceById, createResource, updateResource, deleteResource (with 409 integrity check)
 │   │   │   ├── request.controller.ts      # createRequest, getRequests, getRequestById, updateRequestStatus, cancelOwnRequest
 │   │   │   ├── allocation.controller.ts   # allocateResource, getAllocations, updateAllocationStatusHandler
-│   │   │   └── dashboard.controller.ts    # getDashboardStats (aggregated metrics, role-scoped for field_user)
+│   │   │   ├── dashboard.controller.ts    # getDashboardStats, getAnalyticsData (Reports & Analytics)
+│   │   │   └── user.controller.ts         # listUsers, updateUserRole, toggleUserStatus (Admin Master Data)
 │   │   ├── routes/
 │   │   │   ├── auth.routes.ts             # POST /register, POST /login, GET /me
 │   │   │   ├── centre.routes.ts           # GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 │   │   │   ├── resource.routes.ts         # GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 │   │   │   ├── request.routes.ts          # POST /, GET /, GET /:id, PATCH /:id/status, PATCH /:id/cancel
 │   │   │   ├── allocation.routes.ts       # GET /, POST /, PATCH /:id/status
-│   │   │   └── dashboard.routes.ts        # GET /stats
+│   │   │   ├── dashboard.routes.ts        # GET /stats, GET /analytics
+│   │   │   └── user.routes.ts             # GET /, PATCH /:id/role, PATCH /:id/status (Admin Master Data)
 │   │   ├── services/
 │   │   │   └── allocation.service.ts      # Atomic allocation logic, two-phase stock deduction/rollback, lifecycle state machine
 │   │   └── scripts/
 │   │       ├── seed-admin.ts              # CLI script to provision/update admin or coordinator
 │   │       ├── seed-sample-data.ts        # Seeds realistic Delhi NCR centres, resources, requests, and allocations
-│   │       └── verify-workflows.ts        # Automated integration test suite running 8 end-to-end workflows
+│   │       └── verify-workflows.ts        # Exhaustive 14-suite automated integration test covering all edge cases
 │   ├── .env.example
 │   ├── package.json
 │   └── tsconfig.json
@@ -84,23 +95,26 @@ disaster-relief-system/
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── globals.css                # Tailwind CSS v4 @theme inline tokens (--canvas, --surface, --accent, etc.)
-│   │   │   ├── layout.tsx                 # Root layout with Geist font, metadata, light operational workspace
+│   │   │   ├── globals.css                # Centralized CSS variables supporting Light, Dark Midnight, and Tactical themes
+│   │   │   ├── layout.tsx                 # Root layout with ThemeProvider, metadata, and accessible base rules
 │   │   │   ├── page.tsx                   # Root route ('/'): Instant session-checking redirect (/dashboard or /login)
 │   │   │   ├── login/page.tsx             # Sign in form: 400px light card, password reveal toggle, disclaimer
 │   │   │   ├── register/page.tsx          # Public registration (strictly fixed to field_user; no role selection)
-│   │   │   ├── dashboard/page.tsx         # Operations overview: 4 metrics, critical backlog strip, request queue, summaries
-│   │   │   ├── requests/page.tsx          # Request management: debounced search, filters, table, 420px detail drawer, modal create form
-│   │   │   ├── resources/page.tsx         # Inventory tracking: summary strip, facility filter, Add/Edit modal, delete 409 guard
-│   │   │   ├── centres/page.tsx           # Facilities table: 420px drawer with 5-decimal coordinates & stock, Add/Edit modal, soft-delete toggle
-│   │   │   ├── allocations/page.tsx       # 7/5 split: 4-step creation form + reactive context panel; allocation history + lifecycle transitions
-│   │   │   └── map/
-│   │   │       ├── page.tsx               # Full-bleed workspace, 360px docked tool panel, layer toggles, OSRM route calculator, list view table
-│   │   │       └── ReliefMap.tsx          # Client-side Leaflet component with custom SVG markers and dual-layer road polylines
+│   │   │   ├── dashboard/page.tsx         # Operations overview: 4 metrics, critical backlog strip, request queue, summaries, readiness strip
+│   │   │   ├── requests/page.tsx          # Request management: debounced search, filters, table, 420px detail drawer, GPS auto-detect, create modal
+│   │   │   ├── resources/page.tsx         # Inventory tracking: summary strip, facility filter, CSV export, Add/Edit modal, delete 409 guard
+│   │   │   ├── centres/page.tsx           # Facilities table: 420px drawer with 5-decimal coordinates & stock, GPS auto-detect, soft-delete toggle
+│   │   │   ├── allocations/page.tsx       # 7/5 split: 4-step creation wizard with Haversine proximity-sorting, manifest CSV export, lifecycle actions
+│   │   │   ├── map/
+│   │   │   │   ├── page.tsx               # Full-bleed workspace, 360px docked tool panel, interactive pin dropping, OSRM route calculator, list view table
+│   │   │   │   └── ReliefMap.tsx          # Client-side Leaflet component with custom SVG markers, purple interactive pin, and night-vision tile filter
+│   │   │   ├── analytics/page.tsx         # Reports & Analytics: KPI metrics, fulfillment progress, category matrix, centre workload, audit CSV export
+│   │   │   └── users/page.tsx             # Administrator User Master Data Management: search, role badges, role reassign dialog, status toggle
 │   │   ├── components/
 │   │   │   ├── index.ts                   # Barrel export
 │   │   │   ├── AppShell.tsx               # Persistent shell wrapping authenticated routes, mobile drawer, skip link
-│   │   │   ├── Sidebar.tsx                # Deep charcoal (#17232D) sidebar, 6 nav links, teal active strip, user badge, logout
+│   │   │   ├── Sidebar.tsx                # Deep charcoal (#17232D) sidebar, 8 nav links, theme toggle, user badge, logout
+│   │   │   ├── ThemeToggle.tsx            # Multi-theme selector (Light, Dark Midnight, Tactical High-Visibility)
 │   │   │   ├── PageHeader.tsx             # Standard header with breadcrumbs, title, description, and primary/secondary actions
 │   │   │   ├── Button.tsx                 # Button primitive (primary, secondary, tertiary, destructive; sm, md, lg; loading state)
 │   │   │   ├── FormField.tsx              # Input wrapper with label, required asterisk, helper text, and accessible error message
@@ -111,10 +125,29 @@ disaster-relief-system/
 │   │   │   ├── LoadingState.tsx           # Pulse skeletons for tables, metric cards, and panels
 │   │   │   ├── EmptyState.tsx             # Illustrated empty placeholder with action button
 │   │   │   └── ErrorState.tsx             # Alert box with retry trigger
-│   │   ├── lib/
-│   │   │   └── api.ts                     # `apiRequest<T>` wrapper for fetch, handling base URL, JSON headers, bearer auth, and error parsing
-│   │   └── types/
-│   │       └── auth.ts                    # AuthUser, AuthResponse, UserRole types
+│   │   ├── constants/
+│   │   │   ├── theme.constants.ts         # Theme tokens, storage key, theme descriptors
+│   │   │   ├── routes.constants.ts        # App route paths & public routes
+│   │   │   ├── status.constants.ts        # Request/allocation statuses, priority weights, category lists
+│   │   │   ├── navigation.constants.ts    # Role-based sidebar navigation items
+│   │   │   ├── api.constants.ts           # Centralized API endpoint URLs
+│   │   │   └── index.ts                   # Barrel export
+│   │   ├── types/
+│   │   │   ├── auth.ts                    # AuthUser, AuthResponse, UserRole
+│   │   │   ├── common.ts                  # ApiResponse, ApiErrorResponse, GeoLocation, ToastMessage
+│   │   │   ├── theme.ts                   # ThemeMode, ThemeContextType, ThemeOption
+│   │   │   ├── request.ts                 # ReliefRequestItem, CreateRequestPayload, RequestStatus, RequestPriority
+│   │   │   ├── resource.ts                # ResourceItem, CreateResourcePayload, UpdateResourcePayload
+│   │   │   ├── centre.ts                  # ReliefCentreItem, CreateCentrePayload, UpdateCentrePayload
+│   │   │   ├── allocation.ts              # AllocationItem, CreateAllocationPayload, AllocationStatus
+│   │   │   ├── dashboard.ts               # DashboardData, OverviewMetrics, DashboardRecentRequest
+│   │   │   ├── analytics.ts               # AnalyticsData, CategoryDistribution, CentreLoadMetric
+│   │   │   ├── user.ts                    # UserRecord, UpdateUserRolePayload, UpdateUserStatusPayload
+│   │   │   ├── map.ts                     # LocationItem, OsrmRoute, OsrmResponse, CalculatedRouteInfo
+│   │   │   └── index.ts                   # Barrel export
+│   │   └── lib/
+│   │       ├── api.ts                     # `apiRequest<T>` wrapper for fetch, handling base URL, JSON headers, bearer auth, and error parsing
+│   │       └── theme.tsx                  # ThemeContext, ThemeProvider, useTheme hook with localStorage persistence
 │   ├── next.config.ts                     # Next.js config with staticGenerationRetryCount: 3
 │   ├── postcss.config.mjs                 # PostCSS config with @tailwindcss/postcss
 │   └── package.json
@@ -450,12 +483,18 @@ This section provides an itemized breakdown of current completion status (estima
 - [x] **Root Route (`/`):** Instant session check and redirect (`/dashboard` if authenticated, `/login` if not).
 - [x] **Sign In (`/login`):** 400px light card, visible labels, password reveal toggle, alert banners, required college project disclaimer.
 - [x] **Registration (`/register`):** 400px light card, password length validation, no role selector.
-- [x] **Dashboard (`/dashboard`):** 4-metric strip (`Pending requests`, `Critical requests`, `Active relief centres`, truthful `Not available` for pending allocations), attention strip for critical backlog, request queue, priority and allocation breakdowns.
-- [x] **Relief Requests (`/requests`):** Debounced search, category/priority filter, fulfillment ratio column, 420px slide-out detail drawer, validated modal create form, request cancellation dialog.
-- [x] **Resource Inventory (`/resources`):** Inventory summary strip, active facility filter, Add/Edit modal (strictly active centres selectable), delete dialog with verbatim 409 referential error handling.
-- [x] **Relief Centres (`/centres`):** Facilities table, 420px slide-out drawer with 5-decimal WGS84 coordinates and stored inventory list, Add/Edit modal, soft-deactivate/reactivate confirmation dialog.
-- [x] **Allocations (`/allocations`):** 7/5 desktop split with numbered 4-step allocation form, dynamic context panel with fulfillment bar and compatible stock, inline confirmation summary, allocation history table with lifecycle action buttons (`Dispatch`, `Mark delivered`, `Cancel`).
-- [x] **Operations Map (`/map`):** Full-bleed workspace, 360px docked left tool panel, Leaflet + OpenStreetMap engine, custom SVG markers (teal squares for centres, hollow for inactive, priority-coded circles for requests), real road routing via OSRM (distance & duration), dual-layer road polyline, accessible tabular list view fallback.
+- [x] **Dashboard (`/dashboard`):** 4-metric strip (`Pending requests`, `Critical requests`, `Active relief centres`, truthful `Not available` for pending allocations), attention strip for critical backlog, real-time Operational Readiness & Rapid Coordination Barometer (active network status, online depots, total catalogued stock, and rapid navigation pills), request queue, priority and allocation breakdowns.
+- [x] **Relief Requests (`/requests`):** Debounced search, category/priority filter, fulfillment ratio column, 420px slide-out detail drawer, validated modal create form with one-click GPS coordinate capture (`navigator.geolocation`) and query parameter coordinate auto-fill (`?lat=...&lng=...&create=true`), request cancellation dialog.
+- [x] **Resource Inventory (`/resources`):** Inventory summary strip, active facility filter, one-click CSV inventory export, Add/Edit modal (strictly active centres selectable), delete dialog with verbatim 409 referential error handling.
+- [x] **Relief Centres (`/centres`):** Facilities table, 420px slide-out drawer with 5-decimal WGS84 coordinates and stored inventory list, Add/Edit modal with one-click GPS coordinate capture (`navigator.geolocation`), soft-deactivate/reactivate confirmation dialog.
+- [x] **Allocations (`/allocations`):** 7/5 desktop split with numbered 4-step allocation form, dynamic context panel with fulfillment bar and compatible stock, inline confirmation summary, allocation history table with one-click CSV manifest export and lifecycle action buttons (`Dispatch`, `Mark delivered`, `Cancel`).
+- [x] **Operations Map (`/map`):** Full-bleed workspace, 360px docked left tool panel, Leaflet + OpenStreetMap engine, custom SVG markers (teal squares for centres, hollow for inactive, priority-coded circles for requests, purple target pins for custom coordinates), interactive click-to-pin coordinate picker with direct "Create Relief Request here" prefill link, real road routing via OSRM (distance & duration), dual-layer road polyline, accessible tabular list view fallback, night-vision tile inversion filter.
+- [x] **Reports & Analytics (`/analytics`):** Level 0 DFD compliant reporting workspace featuring executive KPIs (Fulfillment Rate %, Total Stock, Units Delivered, Personnel), interactive lifecycle funnel, commodity demand vs stockpile matrix, relief centre workload metrics, and one-click comprehensive audit CSV report export.
+- [x] **User Master Data Management (`/users`):** Administrator master data management workspace allowing admins to inspect all registered users, filter by role, reassign roles (with protection against self-demotion or orphaning the system), and toggle user active/deactivated status.
+- [x] **Proximity-Based Allocation Helper:** Automated Haversine distance calculation comparing selected relief request coordinates to each warehouse location, sorting compatible stock by physical proximity (nearest facility first) with distance badges.
+- [x] **Centralized Multi-Theme Support:** Centralized CSS custom properties in `globals.css` with persistent theme switcher (`useTheme`) supporting 3 operational modes: ReliefOps Light (clean daytime workspace), Midnight Operations (dark charcoal night control room), and Tactical High-Visibility (amber/black outdoor daylight field visibility).
+- [x] **One-Click Data Export Utilities:** Client-side CSV generators for inventory stock audit logs, allocation dispatch manifests, and full operational audit reports.
+- [x] **Automated 14-Suite Test Verification:** `npm --prefix backend run verify:workflows` executes 14 exhaustive end-to-end integration and boundary edge-case tests with 100% pass rate.
 - [x] Clean frontend Next.js production build (`npm --prefix frontend run build` passes with 0 errors).
 
 ---
@@ -464,8 +503,7 @@ This section provides an itemized breakdown of current completion status (estima
 
 While all core project requirements, rubric criteria, and design specifications are completely implemented and functional, the following items represent potential future enhancements, production hardening, or extended features:
 
-#### A. Extended Mapping & GIS Features (Currently Functional via Manual Entry)
-- [ ] **Interactive Map Picking:** Allow clicking on the map canvas to set latitude/longitude coordinates directly when creating a new relief request or centre (currently validated manual decimal degrees input).
+#### A. Extended Mapping & GIS Features
 - [ ] **Multi-Stop Route Optimization:** TSP (Travelling Salesperson Problem) or multi-drop delivery routing for dispatching one resource vehicle to multiple relief requests (currently point-to-point A-to-B via OSRM).
 - [ ] **Self-Hosted OSRM Instance:** Replace public OSRM demo API with a self-hosted Docker OSRM backend to eliminate public rate-limiting in production environments.
 - [ ] **Geofencing / Disaster Boundary Overlays:** GeoJSON polygon overlays on Leaflet to visualize flood zones, earthquake impact zones, or containment perimeters.
@@ -476,7 +514,7 @@ While all core project requirements, rubric criteria, and design specifications 
 
 #### C. Scalability & Advanced Data Management
 - [ ] **Server-Side Pagination:** Add `?page=1&limit=25` cursor/offset pagination to `GET /api/requests` and `GET /api/allocations` for datasets exceeding thousands of records (currently client-side debouncing and filtering).
-- [ ] **PDF & CSV Export:** Export manifest sheets for drivers during dispatch, or CSV audit reports of monthly inventory consumption.
+- [ ] **PDF Export Format:** Generate printable PDF manifest sheets alongside existing CSV export for physical dispatch drivers.
 - [ ] **Resource Expiration Tracking:** Add `expiryDate` and batch numbers to perishable medical supplies and food rations.
 
 #### B. Production Infrastructure & Deployment Hardening

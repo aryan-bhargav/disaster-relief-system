@@ -345,11 +345,40 @@ export default function MapPage() {
     }
   }
 
-  function clearRoute() {
+  const clearRoute = useCallback(() => {
     setRouteCoordinates(null);
     setRouteInfo(null);
     setRouteError("");
-  }
+  }, []);
+
+  // Map canvas interactive click handler to drop custom pin
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    const customItem: LocationItem = {
+      id: `custom-pin-${Date.now()}`,
+      name: `Pinned Point (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+      type: "custom",
+      lat,
+      lng,
+      details: "Custom dropped pin on map canvas",
+    };
+    setSelectedItem(customItem);
+    setToastMessage({
+      text: `Pinned coordinate: [${lat.toFixed(5)}, ${lng.toFixed(5)}]. Ready for routing or request creation.`,
+      type: "info",
+    });
+  }, []);
+
+  // Selectable items list (including any active custom pin)
+  const selectableItems = useMemo(() => {
+    if (
+      selectedItem &&
+      selectedItem.type === "custom" &&
+      !validItems.some((i) => i.id === selectedItem.id)
+    ) {
+      return [selectedItem, ...validItems];
+    }
+    return validItems;
+  }, [selectedItem, validItems]);
 
   return (
     <AppShell user={user} fullBleed={true}>
@@ -490,6 +519,10 @@ export default function MapPage() {
                   <div className="w-3.5 h-3.5 rounded-full bg-[#026AA2] shrink-0" />
                   <span>Standard request</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 rounded-full bg-[#7C3AED] shrink-0" />
+                  <span>Custom pin</span>
+                </div>
               </div>
             </div>
 
@@ -499,7 +532,11 @@ export default function MapPage() {
                 <div className="flex items-start justify-between">
                   <div className="min-w-0 pr-2">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                      {selectedItem.type === "centre" ? "Relief Centre" : "Relief Request"}
+                      {selectedItem.type === "centre"
+                        ? "Relief Centre"
+                        : selectedItem.type === "custom"
+                        ? "Custom Pinned Location"
+                        : "Relief Request"}
                     </span>
                     <h3 className="text-sm font-semibold text-[var(--text)] truncate">
                       {selectedItem.name}
@@ -521,6 +558,10 @@ export default function MapPage() {
                 <div className="flex items-center gap-2">
                   {selectedItem.type === "centre" ? (
                     <StatusBadge status={selectedItem.status || "active"} />
+                  ) : selectedItem.type === "custom" ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                      Interactive Pin
+                    </span>
                   ) : (
                     <>
                       {selectedItem.priority && (
@@ -559,20 +600,30 @@ export default function MapPage() {
                   </Button>
                 </div>
 
-                {/* Link to record page */}
-                <div className="pt-1 text-right">
-                  <Link
-                    href={selectedItem.type === "centre" ? "/centres" : "/requests"}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline"
-                  >
-                    Open detailed record
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                {/* Link to record page or create request from custom pin */}
+                <div className="pt-1 flex items-center justify-between">
+                  {selectedItem.type === "custom" ? (
+                    <Link
+                      href={`/requests?lat=${selectedItem.lat.toFixed(5)}&lng=${selectedItem.lng.toFixed(5)}&create=true`}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent)] hover:underline"
+                    >
+                      <span>Create Relief Request here</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={selectedItem.type === "centre" ? "/centres" : "/requests"}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--accent)] hover:underline ml-auto"
+                    >
+                      Open detailed record
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (
               <div className="p-3.5 rounded-xl border border-dashed border-[var(--border)] text-center text-xs text-[var(--text-muted)]">
-                Click any marker on the map to inspect location details and configure routing points.
+                Click any marker or click anywhere on the map canvas to drop an interactive pin, inspect coordinates, configure routing, or create a relief request.
               </div>
             )}
 
@@ -601,16 +652,16 @@ export default function MapPage() {
                 <select
                   value={originItem?.id || ""}
                   onChange={(e) => {
-                    const match = validItems.find((i) => i.id === e.target.value);
+                    const match = selectableItems.find((i) => i.id === e.target.value);
                     setOriginItem(match || null);
                   }}
                   className="w-full h-8 px-2 rounded-lg border border-[var(--border)] bg-white text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   aria-label="Select Origin"
                 >
                   <option value="">Choose origin point...</option>
-                  {validItems.map((item) => (
+                  {selectableItems.map((item) => (
                     <option key={item.id} value={item.id}>
-                      [{item.type === "centre" ? "Centre" : "Request"}] {item.name}
+                      [{item.type === "centre" ? "Centre" : item.type === "custom" ? "Custom Pin" : "Request"}] {item.name}
                     </option>
                   ))}
                 </select>
@@ -634,16 +685,16 @@ export default function MapPage() {
                 <select
                   value={destinationItem?.id || ""}
                   onChange={(e) => {
-                    const match = validItems.find((i) => i.id === e.target.value);
+                    const match = selectableItems.find((i) => i.id === e.target.value);
                     setDestinationItem(match || null);
                   }}
                   className="w-full h-8 px-2 rounded-lg border border-[var(--border)] bg-white text-xs text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   aria-label="Select Destination"
                 >
                   <option value="">Choose destination point...</option>
-                  {validItems.map((item) => (
+                  {selectableItems.map((item) => (
                     <option key={item.id} value={item.id}>
-                      [{item.type === "centre" ? "Centre" : "Request"}] {item.name}
+                      [{item.type === "centre" ? "Centre" : item.type === "custom" ? "Custom Pin" : "Request"}] {item.name}
                     </option>
                   ))}
                 </select>
@@ -714,9 +765,9 @@ export default function MapPage() {
         </aside>
 
         {/* Right Canvas / Work Area */}
-        <section className="flex-1 h-[55vh] lg:h-full relative overflow-hidden bg-white">
+        <section className="flex-1 h-[55vh] lg:h-full relative overflow-hidden bg-[var(--surface)]">
           {viewMode === "map" ? (
-            <div className="w-full h-full relative">
+            <div className="absolute inset-0 w-full h-full">
               <ReliefMap
                 items={validItems}
                 selectedItem={selectedItem}
@@ -726,6 +777,7 @@ export default function MapPage() {
                 onSelectItem={(item) => setSelectedItem(item)}
                 onSelectOrigin={(item) => setOriginItem(item)}
                 onSelectDestination={(item) => setDestinationItem(item)}
+                onMapClick={handleMapClick}
               />
             </div>
           ) : (

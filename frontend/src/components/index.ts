@@ -10,3 +10,4 @@ export * from "./Toast";
 export * from "./PageHeader";
 export * from "./Sidebar";
 export * from "./AppShell";
+export * from "./ThemeToggle";

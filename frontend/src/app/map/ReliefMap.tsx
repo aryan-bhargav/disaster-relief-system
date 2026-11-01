@@ -7,7 +7,7 @@ import "leaflet/dist/leaflet.css";
 export interface LocationItem {
   id: string;
   name: string;
-  type: "centre" | "request";
+  type: "centre" | "request" | "custom";
   lat: number;
   lng: number;
   details: string;
@@ -28,6 +28,7 @@ interface ReliefMapProps {
   onSelectItem: (item: LocationItem) => void;
   onSelectOrigin: (item: LocationItem) => void;
   onSelectDestination: (item: LocationItem) => void;
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 export default function ReliefMap({
@@ -39,12 +40,15 @@ export default function ReliefMap({
   onSelectItem,
   onSelectOrigin,
   onSelectDestination,
+  onMapClick,
 }: ReliefMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
   const markersLayerRef = useRef<LayerGroup | null>(null);
   const casingLayerRef = useRef<Polyline | null>(null);
   const routeLayerRef = useRef<Polyline | null>(null);
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   // Initialize Map client-side only
   useEffect(() => {
@@ -71,15 +75,66 @@ export default function ReliefMap({
         maxZoom: 19,
       }).addTo(map);
 
+      // Listen for click anywhere on map canvas to drop inspect pin
+      map.on("click", (e) => {
+        if (onMapClickRef.current) {
+          onMapClickRef.current(e.latlng.lat, e.latlng.lng);
+        }
+      });
+
       const markersLayer = L.layerGroup().addTo(map);
       markersLayerRef.current = markersLayer;
       mapInstanceRef.current = map;
+
+      // Invalidate size immediately and after layout paint to ensure 100% full height & width tile coverage
+      map.invalidateSize();
+      const timer1 = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 100);
+      const timer2 = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 350);
+
+      // Listen to resize events and container bounds change
+      const handleResize = () => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      };
+      window.addEventListener("resize", handleResize);
+
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.invalidateSize();
+          }
+        });
+        resizeObserver.observe(mapContainerRef.current);
+      }
+
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        window.removeEventListener("resize", handleResize);
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+      };
     }
 
-    void initMap();
+    let cleanupFn: (() => void) | undefined;
+    void initMap().then((res) => {
+      cleanupFn = res;
+    });
 
     return () => {
       isMounted = false;
+      cleanupFn?.();
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -113,11 +168,20 @@ export default function ReliefMap({
           item.lng <= 180
       );
 
-      if (validItems.length === 0) return;
+      const allToRender = [...validItems];
+      if (
+        selectedItem &&
+        selectedItem.type === "custom" &&
+        !allToRender.some((i) => i.id === selectedItem.id)
+      ) {
+        allToRender.push(selectedItem);
+      }
+
+      if (allToRender.length === 0) return;
 
       const bounds = L.latLngBounds([]);
 
-      validItems.forEach((item) => {
+      allToRender.forEach((item) => {
         const isSelected = selectedItem?.id === item.id;
         const isOrigin = origin?.id === item.id;
         const isDestination = destination?.id === item.id;
@@ -127,7 +191,34 @@ export default function ReliefMap({
         let width = 28;
         let height = 28;
 
-        if (item.type === "centre") {
+        if (item.type === "custom") {
+          // Custom dropped pin
+          markerHtml = `
+            <div style="
+              width: 32px;
+              height: 32px;
+              background: #7C3AED;
+              border: 2.5px solid #FFFFFF;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #FFFFFF;
+              box-shadow: 0 4px 10px rgba(124,58,237,0.5);
+              outline: 3px solid #17232D; outline-offset: 2px;
+            ">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="22" y1="12" x2="18" y2="12"/>
+                <line x1="6" y1="12" x2="2" y2="12"/>
+                <line x1="12" y1="6" x2="12" y2="2"/>
+                <line x1="12" y1="22" x2="12" y2="18"/>
+              </svg>
+            </div>
+          `;
+          width = 32;
+          height = 32;
+        } else if (item.type === "centre") {
           if (item.isActive === false) {
             // Inactive centre: Grey square, hollow
             markerHtml = `
@@ -409,8 +500,8 @@ export default function ReliefMap({
   return (
     <div
       ref={mapContainerRef}
-      className="w-full h-full relative z-0 focus:outline-none"
-      style={{ minHeight: "400px" }}
+      className="w-full h-full absolute inset-0 z-0 focus:outline-none"
+      style={{ height: "100%", width: "100%", minHeight: "100%" }}
     />
   );
 }

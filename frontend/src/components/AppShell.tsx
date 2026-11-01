@@ -86,13 +86,17 @@ export function AppShell({
       </div>
 
       {/* Main Content Area */}
-      <div className="lg:pl-[240px] flex flex-col min-h-screen">
+      <div
+        className={`lg:pl-[240px] flex flex-col ${
+          fullBleed ? "h-screen overflow-hidden" : "min-h-screen"
+        }`}
+      >
         <main
           id="main-content"
           tabIndex={-1}
-          className={`flex-1 focus:outline-none ${
+          className={`flex-1 focus:outline-none flex flex-col ${
             fullBleed
-              ? "h-[calc(100vh-3.5rem)] lg:h-screen overflow-hidden p-0"
+              ? "h-[calc(100vh-3.5rem)] lg:h-full overflow-hidden p-0"
               : "p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full mx-auto"
           }`}
         >
