@@ -1,4 +1,3 @@
-
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
 
@@ -13,15 +12,31 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { body, token, headers, ...rest } = options;
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...rest,
-    headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...rest,
+      headers: {
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    if (
+      errorMsg.toLowerCase().includes("failed to fetch") ||
+      errorMsg.toLowerCase().includes("networkerror") ||
+      errorMsg.toLowerCase().includes("load failed") ||
+      errorMsg.toLowerCase().includes("abort")
+    ) {
+      throw new Error(
+        `Unable to reach backend API at ${API_URL}. Please ensure the backend server is running and MongoDB is connected.`
+      );
+    }
+    throw error;
+  }
 
   const data = await response.json().catch(() => null);
 
